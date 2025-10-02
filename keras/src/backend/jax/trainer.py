@@ -63,7 +63,6 @@ class JAXTrainer(base_trainer.Trainer):
             y=y,
             y_pred=y_pred,
             sample_weight=sample_weight,
-            training=training,
         )
         if losses:
             self._losses_override.clear()

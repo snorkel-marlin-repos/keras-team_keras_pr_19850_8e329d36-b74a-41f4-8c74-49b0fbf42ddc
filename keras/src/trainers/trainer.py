@@ -1,4 +1,3 @@
-import inspect
 import platform
 import warnings
 
@@ -26,9 +25,6 @@ class Trainer:
         self.steps_per_execution = 1
         # Can be set by callbacks in on_train_begin
         self._initial_epoch = None
-        self._compute_loss_has_training_arg = (
-            "training" in inspect.signature(self.compute_loss).parameters
-        )
 
     @traceback_utils.filter_traceback
     @tracking.no_automatic_dependency_tracking
@@ -266,7 +262,6 @@ class Trainer:
         y=None,
         y_pred=None,
         sample_weight=None,
-        training=True,
     ):
         """Compute the total loss, validate it, and return it.
 
@@ -281,7 +276,7 @@ class Trainer:
                 super().__init__(*args, **kwargs)
                 self.loss_tracker = metrics.Mean(name='loss')
 
-            def compute_loss(self, x, y, y_pred, sample_weight, training=True):
+            def compute_loss(self, x, y, y_pred, sample_weight):
                 loss = ops.means((y_pred - y) ** 2)
                 loss += ops.sum(self.losses)
                 self.loss_tracker.update_state(loss)
@@ -311,15 +306,12 @@ class Trainer:
             y: Target data.
             y_pred: Predictions returned by the model (output of `model(x)`)
             sample_weight: Sample weights for weighting the loss function.
-            training: Whether we are training or evaluating the model.
 
         Returns:
             The total loss as a scalar tensor, or `None` if no loss results
             (which is the case when called by `Model.test_step`).
         """
-        # The default implementation does not use `x` or `training`.
-        del x
-        del training
+        del x  # The default implementation does not use `x`.
         losses = []
         if self._compile_loss is not None:
             loss = self._compile_loss(y, y_pred, sample_weight)
@@ -339,27 +331,6 @@ class Trainer:
             total_loss = ops.sum(losses)
         return total_loss
 
-    def _compute_loss(
-        self,
-        x=None,
-        y=None,
-        y_pred=None,
-        sample_weight=None,
-        training=True,
-    ):
-        """Backwards compatibility wrapper for `compute_loss`.
-
-        This should be used instead `compute_loss` within `train_step` and
-        `test_step` to support overrides of `compute_loss` that may not have
-        the `training` argument, as this argument was added in Keras 3.3.
-        """
-        if self._compute_loss_has_training_arg:
-            return self.compute_loss(
-                x, y, y_pred, sample_weight, training=training
-            )
-        else:
-            return self.compute_loss(x, y, y_pred, sample_weight)
-
     def stateless_compute_loss(
         self,
         trainable_variables,
@@ -369,7 +340,6 @@ class Trainer:
         y=None,
         y_pred=None,
         sample_weight=None,
-        training=True,
     ):
         var_mapping = list(zip(self.trainable_variables, trainable_variables))
         var_mapping.extend(
@@ -379,12 +349,11 @@ class Trainer:
         with backend.StatelessScope(state_mapping=var_mapping) as scope:
             # Note that this is needed for the regularization loss, which need
             # the latest value of train/non-trainable variables.
-            loss = self._compute_loss(
+            loss = self.compute_loss(
                 x,
                 y,
                 y_pred,
                 sample_weight=sample_weight,
-                training=training,
             )
 
         # Update non trainable vars (may have been updated in compute_loss)
