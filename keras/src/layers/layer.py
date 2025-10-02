@@ -507,7 +507,7 @@ class Layer(BackendLayer, Operation, KerasSaveable):
             else:
                 initializer = "zeros"
         initializer = initializers.get(initializer)
-        with backend.name_scope(self.name, caller=self):
+        with self._open_name_scope():
             variable = backend.Variable(
                 initializer=initializer,
                 shape=shape,

@@ -500,7 +500,6 @@ class GRU(RNN):
             trainable=kwargs.get("trainable", True),
             name="gru_cell",
             seed=seed,
-            implementation=kwargs.pop("implementation", 2),
         )
         super().__init__(
             cell,
